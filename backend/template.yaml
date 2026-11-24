@@ -1,0 +1,363 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  TripPlanner AI - Backend serverless (Canal 1: operaciones de negocio).
+  Lambdas + API Gateway + DynamoDB para Viajes, Itinerarios y Reservas.
+  Estas MISMAS Lambdas son invocadas directamente (sin pasar por API Gateway)
+  por las nuevas Tools del OrchestratorAgent (Canal 2, agentico) via boto3 lambda.invoke.
+  No toca ni reemplaza el stack de AgentCore (ese sigue administrado por CDK aparte).
+
+Parameters:
+  OrchestratorArn:
+    Type: String
+    Default: ""
+    Description: "ARN del runtime OrchestratorAgent de AgentCore. Vacio = no se crea el proxy de streaming."
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: "Origen permitido por CORS en el endpoint de streaming (ej. https://xxxx.cloudfront.net o la URL del sitio S3)."
+
+Conditions:
+  HasOrchestrator: !Not [!Equals [!Ref OrchestratorArn, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        TRIPS_TABLE: !Ref TripsTable
+        ITINERARIES_TABLE: !Ref ItinerariesTable
+        RESERVATIONS_TABLE: !Ref ReservationsTable
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type'"
+      AllowOrigin: "'*'"
+    MethodSettings:
+      - ResourcePath: "/*"
+        HttpMethod: "*"
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+Resources:
+
+  # ---------- DynamoDB ----------
+
+  TripsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TripPlanner-Trips
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tripId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tripId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  ItinerariesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TripPlanner-Itineraries
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tripId
+          AttributeType: S
+        - AttributeName: itineraryId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tripId
+          KeyType: HASH
+        - AttributeName: itineraryId
+          KeyType: RANGE
+
+  ReservationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TripPlanner-Reservations
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tripId
+          AttributeType: S
+        - AttributeName: reservationId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tripId
+          KeyType: HASH
+        - AttributeName: reservationId
+          KeyType: RANGE
+
+  # ---------- Lambdas: Viajes ----------
+
+  CreateTripFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-CreateTrip
+      CodeUri: lambdas/create_trip/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TripsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /trips
+            Method: post
+
+  GetTripsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-GetTrips
+      CodeUri: lambdas/get_trips/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TripsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /trips
+            Method: get
+
+  UpdateTripFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-UpdateTrip
+      CodeUri: lambdas/update_trip/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TripsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /trips/{tripId}
+            Method: put
+
+  # ---------- Lambdas: Itinerarios ----------
+
+  CreateItineraryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-CreateItinerary
+      CodeUri: lambdas/create_itinerary/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItinerariesTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /itineraries
+            Method: post
+
+  UpdateItineraryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-UpdateItinerary
+      CodeUri: lambdas/update_itinerary/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItinerariesTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /itineraries/{tripId}/{itineraryId}
+            Method: put
+
+  GetItinerariesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-GetItineraries
+      CodeUri: lambdas/get_itineraries/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ItinerariesTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /itineraries
+            Method: get
+
+  # ---------- Lambdas: Reservas ----------
+
+  CreateReservationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-CreateReservation
+      CodeUri: lambdas/create_reservation/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReservationsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /reservations
+            Method: post
+
+  GetReservationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-GetReservations
+      CodeUri: lambdas/get_reservations/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ReservationsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /reservations
+            Method: get
+
+  UpdateReservationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-UpdateReservation
+      CodeUri: lambdas/update_reservation/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReservationsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /reservations/{tripId}/{reservationId}
+            Method: put
+
+  DeleteReservationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TripPlanner-DeleteReservation
+      CodeUri: lambdas/delete_reservation/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReservationsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /reservations/{tripId}/{reservationId}
+            Method: delete
+
+  # ---------- Frontend estatico (S3 website) ----------
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "tripplanner-ai-frontend-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadForStaticWebsite
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  # ---------- Canal 2: proxy de STREAMING hacia AgentCore (sin API Gateway) ----------
+
+  StreamChatFunction:
+    Type: AWS::Serverless::Function
+    Condition: HasOrchestrator
+    Properties:
+      FunctionName: TripPlanner-StreamChat
+      CodeUri: lambdas/stream_chat/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 300
+      MemorySize: 256
+      Environment:
+        Variables:
+          ORCHESTRATOR_ARN: !Ref OrchestratorArn
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: bedrock-agentcore:InvokeAgentRuntime
+              Resource:
+                - !Ref OrchestratorArn
+                - !Sub "${OrchestratorArn}/*"
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
+
+  StreamChatInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasOrchestrator
+    Properties:
+      FunctionName: !Ref StreamChatFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
+Outputs:
+  ApiUrl:
+    Description: "URL base del API Gateway (Canal 1) - esta es la URL que usa el FRONTEND"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  CreateTripFunctionArn:
+    Description: "ARN para que el Orchestrator la invoque directamente (Canal 2)"
+    Value: !GetAtt CreateTripFunction.Arn
+  GetTripsFunctionArn:
+    Value: !GetAtt GetTripsFunction.Arn
+  UpdateTripFunctionArn:
+    Value: !GetAtt UpdateTripFunction.Arn
+  CreateItineraryFunctionArn:
+    Value: !GetAtt CreateItineraryFunction.Arn
+  UpdateItineraryFunctionArn:
+    Value: !GetAtt UpdateItineraryFunction.Arn
+  CreateReservationFunctionArn:
+    Value: !GetAtt CreateReservationFunction.Arn
+  GetReservationsFunctionArn:
+    Value: !GetAtt GetReservationsFunction.Arn
+  UpdateReservationFunctionArn:
+    Value: !GetAtt UpdateReservationFunction.Arn
+  GetItinerariesFunctionArn:
+    Value: !GetAtt GetItinerariesFunction.Arn
+  StreamUrl:
+    Condition: HasOrchestrator
+    Description: "URL del endpoint de STREAMING (Canal 2) - la usa el chat del FRONTEND"
+    Value: !GetAtt StreamChatFunctionUrl.FunctionUrl
+  FrontendBucketName:
+    Description: "Bucket S3 donde se sube el frontend"
+    Value: !Ref FrontendBucket
+  WebsiteUrl:
+    Description: "URL publica del frontend"
+    Value: !GetAtt FrontendBucket.WebsiteURL
