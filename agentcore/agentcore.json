@@ -7,8 +7,124 @@
     "agentcore:created-by": "agentcore-cli",
     "agentcore:project-name": "tripplannera2a"
   },
-  "runtimes": [],
-  "memories": [],
+  "runtimes": [
+    {
+      "name": "FlightsAgent",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/FlightsAgent/",
+      "runtimeVersion": "PYTHON_3_14",
+      "networkMode": "PUBLIC",
+      "protocol": "A2A",
+      "envVars": [
+        {
+          "name": "KIWI_MCP_URL",
+          "value": "https://mcp.kiwi.com"
+        },
+        {
+          "name": "LLM_PROVIDER",
+          "value": "bedrock"
+        },
+        {
+          "name": "BEDROCK_MODEL_ID",
+          "value": "amazon.nova-pro-v1:0"
+        }
+      ]
+    },
+    {
+      "name": "WeatherAgent",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/WeatherAgent/",
+      "runtimeVersion": "PYTHON_3_14",
+      "networkMode": "PUBLIC",
+      "protocol": "A2A",
+      "envVars": [
+        {
+          "name": "LLM_PROVIDER",
+          "value": "bedrock"
+        },
+        {
+          "name": "BEDROCK_MODEL_ID",
+          "value": "amazon.nova-pro-v1:0"
+        }
+      ]
+    },
+    {
+      "name": "OrchestratorAgent",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/OrchestratorAgent/",
+      "runtimeVersion": "PYTHON_3_14",
+      "networkMode": "PUBLIC",
+      "protocol": "HTTP",
+      "envVars": [
+        {
+          "name": "FLIGHTS_AGENT_URL",
+          "value": "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A450730497156%3Aruntime%2Ftripplannera2a_FlightsAgent-hur2b15rfN/invocations"
+        },
+        {
+          "name": "WEATHER_AGENT_URL",
+          "value": "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A450730497156%3Aruntime%2Ftripplannera2a_WeatherAgent-sDGSNNFVxZ/invocations"
+        },
+        {
+          "name": "TRIP_MEMORY_ID",
+          "value": "tripplannera2a_TripPlannerMemory-4Ofnuy8xrc"
+        },
+        {
+          "name": "LLM_PROVIDER",
+          "value": "bedrock"
+        },
+        {
+          "name": "BEDROCK_MODEL_ID",
+          "value": "amazon.nova-pro-v1:0"
+        }
+      ]
+    }
+  ],
+  "memories": [
+    {
+      "name": "TripPlannerMemory",
+      "eventExpiryDuration": 30,
+      "strategies": [
+        {
+          "type": "USER_PREFERENCE",
+          "name": "TravelerPreferences",
+          "description": "Preferencias de viaje del usuario (horarios, aerolineas, asientos).",
+          "namespaceTemplates": [
+            "/preferences/{actorId}/"
+          ]
+        },
+        {
+          "type": "SUMMARIZATION",
+          "name": "SessionSummarizer",
+          "description": "Resumen por sesion de planificacion de viaje.",
+          "namespaceTemplates": [
+            "/summaries/{actorId}/{sessionId}/"
+          ]
+        },
+        {
+          "type": "SEMANTIC",
+          "name": "TravelFacts",
+          "description": "Hechos relevantes del viaje recuperables por significado.",
+          "namespaceTemplates": [
+            "/facts/{actorId}/"
+          ]
+        },
+        {
+          "type": "EPISODIC",
+          "name": "TripEvents",
+          "description": "Eventos puntuales de busqueda de vuelos, con reflexion posterior.",
+          "namespaceTemplates": [
+            "/events/{actorId}/{sessionId}/"
+          ],
+          "reflectionNamespaceTemplates": [
+            "/events/{actorId}/"
+          ]
+        }
+      ]
+    }
+  ],
   "knowledgeBases": [],
   "credentials": [],
   "evaluators": [],
