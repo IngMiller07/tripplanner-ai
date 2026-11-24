@@ -382,6 +382,10 @@ aws cloudformation delete-stack --stack-name AgentCore-tripplannera2a-default --
 - [Guion de la demostración](docs/GUION_DEMO.md)
 - [Modelo de lenguaje: Bedrock o API externa](docs/MODELO_EXTERNO.md)
 
-**Autor:** Miller Andrés Pacheco Rangel · GitHub [@IngMiller07](https://github.com/IngMiller07) · Corporación Universitaria Latinoamericana (CUL)
+**Autores**
 
-<!-- Si el trabajo fue en equipo, agrega aquí a tus compañeros. -->
+- Miller Andrés Pacheco Rangel · GitHub [@IngMiller07](https://github.com/IngMiller07)
+- Juan Armella
+- Cristian Marquez
+
+Corporación Universitaria Latinoamericana (CUL) · Programación Agéntica · Trabajo final
