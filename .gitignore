@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------
+# TripPlanner AI - lo que NO se sube al repositorio
+# ---------------------------------------------------------------
+
+# Dependencias y compilados (se regeneran con npm install / sam build / vite build)
+node_modules/
+dist/
+.aws-sam/
+cdk.out/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Registros y estado local del despliegue (contienen ids y ARNs de TU cuenta)
+*.log
+deploy.log
+agentcore/.cli/
+samconfig.toml
+
+# Secretos y credenciales: JAMAS al repositorio
+.env
+.env.*
+*.pem
+*.key
+.aws/
+credentials
+
+# Archivos de trabajo que no hacen falta para ejecutar el proyecto
+EMPIEZA_AQUI.txt
+git-init.ps1
+*.zip
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.kiro/
+.DS_Store
+Thumbs.db
